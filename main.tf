@@ -45,6 +45,16 @@ resource "aws_transfer_server" "default" {
     }
   }
 
+  dynamic "workflow_details" {
+    for_each = var.enable_workflow ? [1] : []
+    content {
+      on_upload {
+        execution_role = var.workflow_details.on_upload.execution_role
+        workflow_id    = var.workflow_details.on_upload.workflow_id
+      }
+    }
+  }
+
   tags = module.this.tags
 }
 
