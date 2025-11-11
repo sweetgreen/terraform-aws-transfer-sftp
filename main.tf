@@ -112,7 +112,7 @@ resource "aws_transfer_ssh_key" "default" {
 resource "aws_eip" "sftp" {
   count = local.enabled && var.eip_enabled ? length(var.subnet_ids) : 0
 
-  vpc = local.is_vpc
+  domain = "vpc"
 
   tags = module.this.tags
 }
@@ -230,12 +230,17 @@ resource "aws_iam_policy" "s3_access_for_sftp_users" {
 resource "aws_iam_role" "s3_access_for_sftp_users" {
   for_each = local.enabled ? local.user_names_map : {}
 
-  name = module.iam_label[each.value.user_name].id
-
-  assume_role_policy  = join("", data.aws_iam_policy_document.assume_role_policy[*].json)
-  managed_policy_arns = [aws_iam_policy.s3_access_for_sftp_users[each.value.user_name].arn]
+  name               = module.iam_label[each.value.user_name].id
+  assume_role_policy = join("", data.aws_iam_policy_document.assume_role_policy[*].json)
 
   tags = module.this.tags
+}
+
+resource "aws_iam_role_policy_attachment" "s3_access_for_sftp_users" {
+  for_each = local.enabled ? local.user_names_map : {}
+
+  role       = aws_iam_role.s3_access_for_sftp_users[each.value.user_name].name
+  policy_arn = aws_iam_policy.s3_access_for_sftp_users[each.value.user_name].arn
 }
 
 resource "aws_iam_policy" "logging" {
@@ -250,9 +255,15 @@ resource "aws_iam_policy" "logging" {
 resource "aws_iam_role" "logging" {
   count = local.enabled ? 1 : 0
 
-  name                = module.logging_label.id
-  assume_role_policy  = join("", data.aws_iam_policy_document.assume_role_policy[*].json)
-  managed_policy_arns = [join("", aws_iam_policy.logging[*].arn)]
+  name               = module.logging_label.id
+  assume_role_policy = join("", data.aws_iam_policy_document.assume_role_policy[*].json)
 
   tags = module.this.tags
+}
+
+resource "aws_iam_role_policy_attachment" "logging" {
+  count = local.enabled ? 1 : 0
+
+  role       = one(aws_iam_role.logging[*].name)
+  policy_arn = one(aws_iam_policy.logging[*].arn)
 }
